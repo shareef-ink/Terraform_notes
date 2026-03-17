@@ -1,4 +1,3 @@
-
 provider "aws" {
 	 
 	region = "us-east-1"
@@ -69,3 +68,103 @@ resource "aws_route_table_association" "shareef_rta" {
 	route_table_id = aws_route_table.shareef_rt.id
 
 }
+
+
+
+# 6. create security group to allow port 22,80,443,or all ports traffic
+
+resource "aws_security_group" "shareef_sg" {
+
+	name = "shareef-sg"
+	description = "Allow ll traffic"
+	vpc_id	= aws_vpc.shareef_vpc.id
+
+
+	ingress {
+	  from_port = 22 
+	  to_port   = 22
+	  protocol  = "tcp"
+	  cidr_blocks = ["0.0.0.0/0"]
+	}
+
+	ingress {
+	  from_port = 80
+	  to_port   = 80
+	  protocol  = "tcp"
+	  cidr_blocks = ["0.0.0.0/0"]
+	}
+
+	ingress {
+	  from_port = 443
+	  to_port   = 443
+	  protocol  = "tcp"
+	  cidr_blocks = ["0.0.0.0/0"]
+
+	}
+
+ 	egress {
+	  from_port = 0
+	  to_port  = 0
+	  protocol  ="-1"
+	  cidr_blocks = ["0.0.0.0/0"]
+	}
+	
+	tags =  {
+	Name = "shareef-sg"
+
+	}
+}
+
+# 7. create a network interface with an ip in the subnet that was created in step
+
+ 
+ resource "aws_network_interface" "shareef_eni" {
+	subnet_id = aws_subnet.shareef_sn.id
+	private_ips = ["10.19.100.143"]
+	security_groups = [aws_security_group.shareef_sg.id]
+	tags  = {
+	Name = "shareef-eni"
+	}
+}
+
+
+# 8. Assign an elastic ip to the network interface
+
+ resource "aws_eip" "shareef_eip" {
+	network_interface = aws_network_interface.shareef_eni.id
+	domain = "vpc"
+	
+	tags = {
+	Name = "shareef-eip"
+	}
+
+}
+
+
+# 9. create a ec2 server 
+
+ resource "aws_instance" "shareef_server" {
+	instance_type = "t3.micro"
+	key_name      = "Linux"
+	ami = "ami-02dfbd4ff395f2a1b"
+	network_interface {
+	 device_index = 0
+	network_interface_id = aws_network_interface.shareef_eni.id
+
+	}
+	
+	user_data = file("facebook.sh")
+	
+	tags = {
+	Name = "shareef-fb-server"
+	}
+
+}
+ 
+
+output "fb-eip" {
+
+	value = aws_eip.shareef_eip.public_ip
+	
+}
+
